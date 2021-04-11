@@ -1,0 +1,35 @@
+#!/bin/bash
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") FILE
+
+'$(basename "$0")' subtracts the contents of FILE from stdin
+on a line-by-line basis and prints the result on stdout:
+only lines in stdin that are NOT found in FILE are printed.
+If FILE doesn't exist, the full contents of stdin are printed.
+
+Note that 2 entire lines in stdin and FILE must match exactly
+in order to be omitted from stdout.
+
+See also: 'subtractmatch'
+DOCSTRING
+}
+
+checkForHelp $1
+minNumArgs 1 $#
+
+if [ -e "$1" ]; then
+    grep -Fxv -f "$1" < /dev/stdin
+else
+    cat -
+fi
+
+exit 0

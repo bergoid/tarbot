@@ -1,0 +1,147 @@
+#!/bin/bash
+
+# Based on Alexander Honda's 'googlemap2png' script
+# https://code.google.com/p/googlemap2png/
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") TYPE Z XMIN XMAX YMIN YMAX [FILENAME_PREFIX] [LANG]
+
+'$(basename "$0")' downloads individual tiles from Google Maps, stitches
+them together to form a mosaic and saves the result in a .png file.
+
+TYPE is either 'sat' for satellite imagery, 'ter' for terrain, 'map' for
+street map or 'hyb' for hybrid (satellite/street).
+
+Z is the zoom level.
+
+The tiles form a rectangular area determined by XMIN, XMAX, YMIN
+and YMAX. The top left tile is at (XMIN,YMIN) and the bottom right
+tile at (XMAX, YMAX).
+
+The downloaded tiles are stored in '~/build/$(basename "$0")/tiles'. Saved
+tiles are not downloaded again in subsequent runs of '$(basename "$0")'.
+
+If FILENAME_PREFIX is specified, the filename of the saved .png
+file will start with FILENAME_PREFIX, followed by the values of
+the other arguments.
+
+The optional argument LANG allows you to change the annotations on
+the map to another language, if available. If you want to specify
+LANG without specifying FILENAME_PREFIX, use '-' for the latter.
+
+Examples:
+
+Creating a street map:
+
+    $ gm2png map 15 16831 16834 10903 10907
+
+The same street map, but with some annotations in Dutch instead of English:
+
+    $ gm2png map 15 16831 16834 10903 10907 - nl
+DOCSTRING
+}
+
+checkForHelp $1
+minNumArgs 6 $#
+
+require wget
+require montage
+
+mapType=$1
+Z=$2
+
+Xmin=$3
+Xmax=$4
+Ymin=$5
+Ymax=$6
+
+if [ "$(echo "$Xmin > $Xmax" | bc)" -eq "1" ]; then
+    exitWith 1 "Error : Xmin > Xmax ($Xmin > $Xmax)"
+fi
+
+if [ "$(echo "$Ymin > $Ymax" | bc)" -eq "1" ]; then
+    exitWith 1 "Error : Ymin > Ymax ($Ymin > $Ymax)"
+fi
+
+lang=$8
+if [ -z "$lang" ]; then
+    langStringRemote=
+    langStringFile=
+else
+    langStringRemote="&hl=$lang"
+    langStringFile="-lang=$lang"
+fi
+
+prefixArg=$7
+if [ "$prefixArg" = "-" ] || [ -z "$prefixArg" ]; then
+    prefix=
+else
+    prefix="$prefixArg--"
+fi
+
+destFile="$prefix$mapType-Z=$Z-Xmin=$Xmin-Xmax=$Xmax-Ymin=$Ymin-Ymax=$Ymax$langStringFile.png"
+if [ -f "$destFile" ]; then
+    exitWith 0 "The file \"$destFile\" already exists. Exiting."
+fi
+
+case "$mapType" in
+    "sat") server="http://khms0.google.com/kh/v=153$langStringRemote";;
+    "ter") server="http://mts0.google.com/vt/lyrs=t@132,r@269000000$langStringRemote";;
+    "map") server="http://mts0.google.com/vt/lyrs=m@269000000$langStringRemote";;
+    "hyb") server="http://mts0.google.com/vt/lyrs=y@269000000$langStringRemote";;
+    *) exitWith 1 "Error: Invalid map type: \"$mapType\"";;
+esac
+
+buildDir="$HOME/build/$(basename "$0")"
+tilesDir="$buildDir/tiles"
+try mkdir -p "$tilesDir"
+
+fileList="$buildDir/file-list.txt"
+> $fileList
+
+userAgentString="Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:16.0) Gecko/20100101 Firefox/16.0"
+
+noErrors=true
+
+for ((y=$Ymin ; y<=$Ymax; y++ ))
+do
+    for ((x=$Xmin ; x<=$Xmax; x++ ))
+    do
+        remoteTile="$server$(echo "&z=$Z&x=$x&y=$y")"
+        localTile=$tilesDir/"$mapType-z=${Z}-x=${x}-y=${y}$langStringFile.png"
+
+        if [ ! -f $localTile ]; then
+            echo "Downloading $remoteTile to $localTile"
+            wget -U "$userAgentString" -q "$remoteTile" -O "$localTile"
+            if [ "$?" -ne "0" ]; then
+                echo "Error while downloading $remoteTile to $localTile" >&2
+                noErrors=false
+                rm -f "$localTile"
+            fi
+        else
+            echo "Using $localTile"
+        fi
+        echo $localTile >> $fileList
+    done
+done
+
+echo $destFile >> $fileList
+
+if $noErrors; then
+    rowLength="$(echo "1+$Xmax-$Xmin" | bc)"
+    echo -n "Creating mosaic ... "
+    cat $fileList | xargs montage -tile ${rowLength}x -geometry 100%x100%+0+0
+    exitOnError "Could not create mosaic."
+    echo "done."
+    echo "$(readlink -f "$destFile")"
+else
+    exitWith 1 "There were errors while downloading the tiles. Mosaic not created."
+fi

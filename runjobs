@@ -1,0 +1,192 @@
+#!/bin/bash
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") WORKER [workers=J] [deadline="YYYY-MM-DD hh:mm:ss"] [count=C] [statusdir=DIR]
+
+'$(basename "$0")'
+DOCSTRING
+}
+
+checkForHelp $1
+minNumArgs 1 $#
+
+export haltfile="/tmp/halt-runjobs"
+export logfile="log.txt"
+export donefile="done.txt"
+export failedfile="failed.txt"
+export countfile="count.txt"
+retryfailedfile="retry-failed.txt"
+
+function logit
+{
+    cat - | ts "%Y-%m-%d %H:%M:%S" >> "$logfile"
+}
+
+export -f logit
+
+function wrapper
+{
+    local worker="$1"
+    local word="$2"
+    local deadline="$3"
+    local count="$4"
+    local breakonfail="$5"
+
+    if [ -n "$count" ]; then
+
+        if [ "$(cat "$countfile" 2>/dev/null | wc -l)" -ge "$count" ]; then
+            echo === Max count reached: "$count". Job SKIPPED for: "$word" | logit
+            return
+        fi
+
+    fi
+
+    if [ -n "$deadline" ]; then
+        if [ "$(date +%s)" -ge "$(date --date="$deadline" +"%s")" ]; then
+            echo === Deadline reached: "$deadline". Job SKIPPED for: "$word" | logit
+            return
+        fi
+    fi
+
+    if [ -f "$haltfile" ]; then
+        echo === File: "$haltfile" found. Job SKIPPED for: "$word" | logit
+        return
+    fi
+
+    if [ -n "$count" ]; then
+        echo . >> "$countfile"
+    fi
+
+    echo === Starting job for: "$word" | logit
+    "$worker" "$word" 2>&1 | logit
+
+    if [ "${PIPESTATUS[0]}" -eq "0" ]; then
+
+        echo "$word" >> "$donefile"
+        echo === Job SUCCEEDED for: "$word" | logit
+
+    else
+
+        echo "$word" >> "$failedfile"
+        echo === Job FAILED for: "$word" | logit
+
+        if [ "$breakonfail" = "true" ]; then
+            echo === Break on failure | logit
+            exit 255
+        fi
+
+    fi
+}
+
+export -f wrapper
+
+function doRunJobs
+{
+    local numWorkers="$1"
+    local worker="$2"
+    local deadline="$3"
+    local count="$4"
+
+    cat - | subtract "$donefile" | subtract "$failedfile" | xargs -r -L 1 -I '{}' -P "$numWorkers" bash -c "wrapper $worker '{}' '$deadline' '$count' '$breakonfail'"
+}
+
+worker="$1"
+shift
+
+deadline=
+numWorkers=4
+retries=0
+statusdir="$PWD"
+count=
+breakonfail="false"
+
+try bash -c "test -f \"$worker\" || which \"$worker\" > /dev/null 2>&1"
+
+while [ -n "$1" ]; do
+
+    [[ "$1" =~ ^deadline=(.*)$ ]] && deadline="${BASH_REMATCH[1]}"
+
+    [[ "$1" =~ ^workers=(.*)$ ]] && numWorkers="${BASH_REMATCH[1]}"
+
+    [[ "$1" =~ ^retries=(.*)$ ]] && retries="${BASH_REMATCH[1]}"
+
+    [[ "$1" =~ ^count=(.*)$ ]] && count="${BASH_REMATCH[1]}"
+
+    [[ "$1" =~ ^statusdir=(.*)$ ]] && statusdir="${BASH_REMATCH[1]}"
+
+    [[ "$1" =~ ^breakonfail=(.*)$ ]] && breakonfail="${BASH_REMATCH[1]}"
+
+    shift
+
+done
+
+try test -d "$statusdir"
+try cd "$statusdir"
+
+if [ "$retries" -gt "0" ]; then
+    if [ -f "$retryfailedfile" ]; then
+        exitWith 1 "Error: file already exists: $(readlink -f "$retryfailedfile")"
+    fi
+fi
+
+echo ==================== | logit
+echo === runjobs START | logit
+echo === worker=$worker | logit
+echo === deadline=$deadline | logit
+echo === numWorkers=$numWorkers | logit
+echo === retries=$retries | logit
+echo === statusdir=$statusdir | logit
+echo === count=$count | logit
+echo === work START | logit
+cat - | doRunJobs "$numWorkers" "$worker" "$deadline" "$count"
+echo === work END | logit
+
+# Don't add retries to the count
+try rm -f "$countfile"
+count=
+
+if [ "$retries" -gt "0" ]; then
+    echo === Retry failed jobs START | logit
+    for ((i=1; i <= retries ; i++))
+    do
+        echo === Retry iteration $i START | logit
+        if [ -s "$failedfile" ]; then
+            sleep 1
+            mv "$failedfile" "$retryfailedfile"
+            echo === Retry work START | logit
+            cat "$retryfailedfile" | doRunJobs "$numWorkers" "$worker" "$deadline"
+            echo === Retry work END | logit
+
+            # If some jobs in $retryfailefile were skipped, add them to $failedfile again before removing $retryfailedfile
+            cat "$retryfailedfile" | subtract "$failedfile" | subtract "$donefile" >> "$failedfile"
+            rm "$retryfailedfile"
+        else
+            echo === "$failedfile" is empty. Nothing to retry. | logit
+        fi
+        echo === Retry iteration $i END | logit
+    done
+    echo === Retry failed jobs END | logit
+fi
+
+if [ -s "$failedfile" ]; then
+    echo === There are still failed jobs | logit
+    echo There are still failed jobs
+    exitStatus=1
+else
+    echo === All jobs succeeded | logit
+    echo All jobs succeeded
+    exitStatus=0
+fi
+
+echo === runjobs END | logit
+echo ==================== | logit
+
+exit "$exitStatus"

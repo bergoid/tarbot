@@ -1,0 +1,33 @@
+#!/bin/bash
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") NAME.zip
+
+'$(basename "$0")' extracts the contents of NAME.zip
+into a folder called NAME.
+
+This tool is useful on host machines that don't have
+an 'unzip' tool, but do have 'python3'.
+DOCSTRING
+}
+
+checkForHelp $1
+minNumArgs 1 $#
+
+require python3
+
+zipFile="$(readlink -f $1)"
+try test -e "$zipFile"
+
+destFolder="$(basename "$zipFile" .zip)"
+try test ! -e "$destFolder"
+
+try python3 -m zipfile -e "$zipFile" "$destFolder"

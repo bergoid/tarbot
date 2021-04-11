@@ -1,0 +1,61 @@
+#!/bin/bash
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") DIR
+
+'$(basename "$0")' converts a Minecraft world created in the
+vanilla client to the Spigot folder layout.
+
+DIR is the vanilla world. A sibling directory called "DIR-spigot"
+is created containing Overworld, Nether & End in Spigot format.
+DOCSTRING
+}
+
+checkForHelp $1
+minNumArgs 1 $#
+
+vanillaDir="$(readlink -f $1)"
+try test -d "$vanillaDir"
+
+worldName="$(basename "$vanillaDir")"
+
+spigotDir="${vanillaDir}-spigot"
+spigotOverworldDir="${spigotDir}/world"
+spigotNetherDir="${spigotDir}/world_nether"
+spigotEndDir="${spigotDir}/world_the_end"
+
+# Create spigot parent dir
+try test ! -d "$spigotDir"
+try mkdir "$spigotDir"
+
+# Create spigot Overworld
+try cp -r "$vanillaDir" "$spigotOverworldDir"
+echo Created: $spigotOverworldDir
+
+# Create spigot Nether, if any
+if [ -d "${spigotOverworldDir}/DIM-1" ]; then
+    try mkdir "${spigotNetherDir}"
+    try mv "${spigotOverworldDir}/DIM-1" "${spigotNetherDir}"
+    echo Created: $spigotNetherDir
+fi
+
+# Create spigot End, if any
+if [ -d "${spigotOverworldDir}/DIM1" ]; then
+    try mkdir "${spigotEndDir}"
+    try mv "${spigotOverworldDir}/DIM1" "${spigotEndDir}"
+    echo Created: $spigotEndDir
+fi
+
+echo
+echo Before importing them into a Multiverse server, load their
+echo parent directory: "$spigotDir"
+echo into a non-Multiverse spigot server, in order to
+echo populate the directories with necessary files.

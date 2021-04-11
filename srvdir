@@ -1,0 +1,78 @@
+#!/bin/bash
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") DIR
+
+'$(basename "$0")' instructs 'lighttpd' to re-load its
+configuration from DIR/etc/lighttpd.conf and to serve
+the direcory DIR/www.
+TODO : backend, scripts
+DOCSTRING
+}
+
+checkForHelp $1
+minNumArgs 1 $#
+
+require lighttpd
+
+requireRoot
+
+directory="$(readlink -f "$1")"
+
+[ -d "$directory/www" ] || exitWith 1 "Error directory '$directory/www' doesn't exist"
+
+confFile="lighttpd.conf"
+directoryConfPath="$directory/etc/$confFile"
+[ -f "$directoryConfPath" ] || exitWith 1 "Error the file '$directoryConfPath' doesn't exist"
+
+# Stop server
+if [ -x "/srv/repo/scripts/serverctl" ]; then
+   try /srv/repo/scripts/serverctl stop
+else
+    try systemctl stop lighttpd.service
+fi
+
+# Create log dir
+logDir=/srv/log
+if [ ! -d "$logDir" ]; then
+
+    try mkdir -p "$logDir"
+    try sudo -u http owntree "$logDir"
+    echo "Directory created: $logDir"
+
+fi
+
+# Create symlink in /srv
+try ln -sfn "$directory" /srv/repo
+echo "Created symlink:  /srv/repo --> $directory"
+
+# Create symlink in /etc
+repoConfPath="/srv/repo/etc/$confFile"
+generalConfPath="/etc/lighttpd/$confFile"
+if [ ! -L "$generalConfPath" ]; then
+
+    if [ -f "$generalConfPath" ]; then
+        # Rename old conf file
+        try mv "$generalConfPath" "${generalConfPath}_BAK_$(randid 5)"
+    fi
+
+    # Create symlink
+    try ln -s "$repoConfFile" "$generalConfPath"
+    echo "Created symlink:  $generalConfPath --> $repoConfPath"
+
+fi
+
+# Start server
+if [ -x "/srv/repo/scripts/serverctl" ]; then
+   try /srv/repo/scripts/serverctl start
+else
+    try systemctl start lighttpd.service
+fi

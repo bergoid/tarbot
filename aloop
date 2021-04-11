@@ -1,0 +1,37 @@
+#!/bin/bash
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") MESSAGE NUMITERATIONS
+
+'$(basename "$0")' runs a 'for' loop NUMITERATIONS times.
+At every iteration, MESSAGE is printed to stdout, together with
+the iteration number, and the script sleeps for 1 second before
+going to the next iteration.
+
+Example:
+    $ aloop Hello 3
+    Hello 1
+    Hello 2
+    Hello 3
+DOCSTRING
+}
+
+checkForHelp $1
+minNumArgs 2 $#
+
+LIMIT=$2
+
+# Double parentheses, and "LIMIT" with no "$".
+for ((i=1; i <= LIMIT ; i++))
+do
+  echo "$1 $i"
+  sleep 1
+done

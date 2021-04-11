@@ -1,0 +1,34 @@
+#!/bin/bash
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") ARGS ...
+
+'$(basename "$0")' picks an item randomly from the given arguments
+and prints it on stdout.
+
+Examples:
+
+$ randitem One Two Three
+Three
+
+$ words=("One" "Two" "Three")
+$ randitem "\${words[@]}"
+Two
+
+DOCSTRING
+}
+
+checkForHelp $1
+
+#RANDOM=$$$(date +%s)
+
+arr=("$@")
+echo ${arr[$RANDOM % ${#arr[@]} ]}

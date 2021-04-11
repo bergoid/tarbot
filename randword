@@ -1,0 +1,52 @@
+#!/bin/bash
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") [NUM]
+
+'$(basename "$0")' generates a random word with NUM syllables.
+NUM is 3 by default. Every syllable has 2 letters: one
+consonant and one vowel. A subset of the alphabet is used.
+
+Example:
+
+$ randword 4
+dovileka
+
+DOCSTRING
+}
+
+checkForHelp $1
+
+#RANDOM=$$$(date +%s)
+
+############################################################
+#
+# Pick a character randomly from a given string and
+# print it on stdout
+#
+function pickchar
+{
+    echo ${1:$(($RANDOM % ${#1} )):1}
+}
+
+consonants="bdfghklmnprstvw"
+vowels="aeiou"
+
+num=${1:-3}
+
+word=
+
+for ((i=0;i<num;i++))
+do
+    word="${word}$(pickchar $consonants)$(pickchar $vowels)"
+done
+
+echo "$word"

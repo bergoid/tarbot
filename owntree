@@ -1,0 +1,35 @@
+#!/bin/bash
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") [DIR] [USERNAME] [GROUPNAME]
+
+'$(basename "$0")' changes ownership of all files and directories
+in the directory tree rooted at DIR, including DIR itself.
+
+The ownership is changed to USERNAME:GROUPNAME.
+
+The default value for GROUPNAME is USERNAME. The default value for USERNAME
+is the current user. The default value for DIR is the current directory.
+
+The user will be asked interactively for the sudo password.
+DOCSTRING
+}
+
+checkForHelp $1
+
+targetDir=${1:-.}
+targetDir=$(readlink -f "$targetDir")
+
+username=${2:-$(whoami)}
+
+groupname=${3:-$username}
+
+sudo chown -R "$username:$groupname" "$targetDir"

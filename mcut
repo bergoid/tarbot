@@ -1,0 +1,43 @@
+#!/bin/bash
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") ARGS
+
+'$(basename "$0")' works the same as 'cut',
+but allows for multi-character delimiters.
+DOCSTRING
+}
+
+checkForHelp $1
+
+# Search and replace "$1" with "$2" in stdin
+function sar
+{
+    sed "s/$(echo "$1" | sed -e 's/\([[\/.*]\|\]\)/\\&/g')/$(echo "$2" | sed -e 's/[\/&]/\\&/g')/g"
+}
+
+strippedArgs=
+magicChar=$'\36'
+
+for arg
+do
+    if [[ $arg == -d* ]]; then
+        delimiter="${arg:2}"
+    elif [[ $arg == --delimiter=* ]]; then
+        delimiter="${arg:12}"
+    elif [[ $arg == -m* ]]; then
+        magicChar="${arg:2}"
+    else
+        strippedArgs="$strippedArgs $arg"
+    fi
+done
+
+sar "$delimiter" "$magicChar" | cut $strippedArgs -d$magicChar

@@ -1,0 +1,68 @@
+#!/bin/bash
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") OUTPUTFILE [DENSITY]
+
+'$(basename "$0")' takes a list of image files from stdin
+and converts them to a pdf file (OUTPUTFILE), one page per
+image.
+The paper size is A4.
+The resolution and density (needed for conversion) are read
+from the input files. If the files don't contain density
+information, it can be given as the argument DENSITY.
+An example of a valid density string (for 300 dpi): 300x300
+DOCSTRING
+}
+
+checkForHelp $1
+minNumArgs 1 $#
+
+require convert
+require identify
+require gs
+
+outputFile="$1"
+densityGiven="$2"
+
+tmpFolder="/tmp/$(randid 8)"
+try test -n "$tmpFolder"
+tru "rm -rf $tmpFolder" mkdir "$tmpFolder"
+try test -d "$tmpFolder"
+
+while read filePath; do
+
+    # Without 'readlink', 'test -e' fails regularly
+    # in the first iteration of this loop.
+    try test -e "$(readlink -f $filePath)"
+
+    imageFilename="$(basename "$filePath")"
+    pageFilename="${imageFilename%.*}.pdf"
+    infoFilename="${imageFilename%.*}.txt"
+
+    try identify -verbose "$filePath" > "${tmpFolder}/${infoFilename}"
+
+    resolution="$(grep Geometry "${tmpFolder}/${infoFilename}" | sed "s/^\s*//" | cut -d ' ' -f 2 | sed "s/\([0-9]\+x[0-9]\+\).*$/\1/")"
+    try test -n "$resolution"
+
+    if [ -n "$densityGiven" ]; then
+        density="$densityGiven"
+    else
+        density="$(grep Resolution "${tmpFolder}/${infoFilename}" | sed "s/^\s*//" | cut -d ' ' -f 2)"
+        try test -n "$density"
+    fi
+
+    try convert "$filePath" -resize "$resolution" -extent "$resolution" -gravity center -units PixelsPerInch -density "$density" "${tmpFolder}/${pageFilename}"
+    echo $pageFilename
+
+done < <(sort)
+
+try gs -dCompatibilityLevel=1.4 -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sPAPERSIZE=a4 -dFIXEDMEDIA -dPDFFITPAGE -sOutputFile="$outputFile" "$tmpFolder"/*.pdf
+echo $outputFile

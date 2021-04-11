@@ -1,0 +1,17 @@
+#!/bin/sed -rf
+#
+# SCRIPTHELP BEGIN
+# Usage: ... | stripesc
+#
+# 'stripesc' removes bash escape sequences from stdin
+# and prints the result on stdout.
+#
+# Example:
+#
+#   $ ls -l --color=always | stripesc | less
+#
+# In the above example, without 'stripesc', a lot of
+# ugly escape sequences would be visble in 'less'.
+# SCRIPTHELP END
+#
+s/\x1b\[[0-9;]*m?//g
