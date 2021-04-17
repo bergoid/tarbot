@@ -95,7 +95,7 @@ function doRunJobs
     local deadline="$3"
     local count="$4"
 
-    cat - | subtract "$donefile" | subtract "$failedfile" | xargs -r -L 1 -I '{}' -P "$numWorkers" bash -c "wrapper $worker '{}' '$deadline' '$count' '$breakonfail'"
+    cat - | subtract "$donefile" | subtract "$failedfile" | xargs -r -I '{}' -P "$numWorkers" bash -c "wrapper $worker '{}' '$deadline' '$count' '$breakonfail'"
 }
 
 worker="$1"
