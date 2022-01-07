@@ -9,10 +9,12 @@ fi
 function showHelp
 {
 cat << DOCSTRING
-Usage: $(basename "$0") PROMPT
+Usage: $(basename "$0") PROMPT [silent]
 
 '$(basename "$0")' asks for user input and prints
 the entered text on stdout.
+When 'silent' is added as a second argument, the
+input is not shown on the screen during typing.
 DOCSTRING
 }
 
@@ -20,6 +22,12 @@ checkForHelp $1
 minNumArgs 1 $#
 
 value=
-echo -n "$1: " >&2 && read value
+
+if [ "$2" = "silent" ]; then
+    echo -n "$1: " >&2 && read -s value
+else
+    echo -n "$1: " >&2 && read value
+fi
+
 echo "$value"
 

@@ -127,10 +127,12 @@ promptfor
 ---------
 ::
 
-  Usage: promptfor PROMPT
+  Usage: promptfor PROMPT [silent]
 
   'promptfor' asks for user input and prints
   the entered text on stdout.
+  When 'silent' is added as a second argument, the
+  input is not shown on the screen during typing.
 
 punzip
 ------
