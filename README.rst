@@ -189,6 +189,18 @@ runjobs
 
   'runjobs'
 
+spigot2vanilla
+--------------
+::
+
+  Usage: spigot2vanilla DIR
+
+  'spigot2vanilla' converts a Minecraft world in the Spigot folder
+  layout to the Vanilla folder layout.
+
+  DIR is the Spigot world. A sibling directory called "DIR-vanilla"
+  is created containing Overworld, Nether & End in Vanilla format.
+
 srvdir
 ------
 ::
