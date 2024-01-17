@@ -98,6 +98,16 @@ images2pdf
   information, it can be given as the argument DENSITY.
   An example of a valid density string (for 300 dpi): 300x300
 
+loct
+----
+::
+
+  Usage: loct ARGS
+
+  'loct' is basically 'ls -la', but adds an extra column
+  at the beginning containing the octal permission digits,
+  as used in 'chmod'.
+
 mcut
 ----
 ::

@@ -1,0 +1,25 @@
+#!/bin/bash
+
+. rabot-utils
+if [ "$?" -ne "0" ]; then
+  echo "$0: Error while sourcing rabot-utils" >&2
+  exit 1
+fi
+
+function showHelp
+{
+cat << DOCSTRING
+Usage: $(basename "$0") ARGS
+
+'$(basename "$0")' is basically 'ls -la', but adds an extra column
+at the beginning containing the octal permission digits,
+as used in 'chmod'.
+DOCSTRING
+}
+
+checkForHelp $1
+
+require awk
+
+ls -la $* | awk '{k=0;for(i=0;i<=8;i++)k+=((substr($1,i+2,1)~/[rwx]/)*2^(8-i));if(k)printf("%0o ",k);print}'
+
