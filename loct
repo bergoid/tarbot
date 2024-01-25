@@ -12,8 +12,8 @@ cat << DOCSTRING
 Usage: $(basename "$0") ARGS
 
 '$(basename "$0")' is basically 'ls -la', but adds an extra column
-at the beginning containing the octal permission digits,
-as used in 'chmod'.
+on the left with the octal permission digits, as used
+in 'chmod'.
 DOCSTRING
 }
 

@@ -105,8 +105,8 @@ loct
   Usage: loct ARGS
 
   'loct' is basically 'ls -la', but adds an extra column
-  at the beginning containing the octal permission digits,
-  as used in 'chmod'.
+  on the left with the octal permission digits, as used
+  in 'chmod'.
 
 mcut
 ----
